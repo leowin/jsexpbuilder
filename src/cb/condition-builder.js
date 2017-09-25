@@ -1,20 +1,40 @@
-//Helps in creating a structure will help later.
-function makeStruct(names) {
-    var names = names.split(' ');
-    var count = names.length;
-    function constructor() {
-        for (var i = 0; i < count; i++) {
-            this[names[i]] = arguments[i];
-        }
-    }
-    return constructor;
-}
+(function ($) {
+    var settings;
 
-var rootcondition = '<table><tr><td class="seperator" ><img src="res/remove.png" alt="Remove" class="remove" /><select><option value="and">And</option><option value="or">Or</option></select></td>';
+    var methods = {
+        init: function (options) {
+            // Create some defaults, extending them with any options that were provided
+            settings = $.extend({
+
+            }, options);
+
+            return this;
+        },
+    };
+
+    $.fn.expressionBuilder = function (method) {
+        if (methods[method]) {
+            return methods[method].apply(this, Array.prototype.slice.call(arguments, 1));
+        }
+        else if (typeof method === 'object' || !method) {
+            return methods.init.apply(this, arguments);
+        }
+        else {
+            $.error('Method ' + method + ' does not exist.');
+        }
+    };
+})(jQuery);
+
+
+
+
+
+
+var rootcondition = '<table class="dropable"><tr class="droptarget"><td class="seperator" ><img src="res/remove.png" alt="Remove" class="remove" /><select><option value="and">And</option><option value="or">Or</option></select></td>';
 rootcondition += '<td><div class="querystmts"></div><div><img class="add" src="res/add.png" alt="Add" /> <button class="addroot">+()</button></div>';
 rootcondition += '</td></tr></table>';
 
-var statement = '<div><img src="res/remove.png" alt="Remove" class="remove" />'
+var statement = '<div draggable="true" class="draggable droptarget" ><span class="handle"> H </span><img src="res/remove.png" alt="Remove" class="remove" />'
 
 statement += '<select class="col">';
 statement += '<option value="code">Code</option>';
@@ -52,7 +72,7 @@ statement += '</select>'
 statement += '<input type="text" /></div>';
 
 var addqueryroot = function (sel, isroot) {
-    $(sel).append(rootcondition);
+    $(sel).append(rootcondition).find('.dropable').on('dragover', dragover).on('drop', drop).on('dragleave', dragleave);
     var q = $(sel).find('table');
     var l = q.length;
     var elem = q;
@@ -72,15 +92,19 @@ var addqueryroot = function (sel, isroot) {
     }
 
     // Add the default staement segment to the root condition
-    elem.find('td >.querystmts').append(statement);
+    var newEle = $(statement).appendTo(elem.find('td >.querystmts'));
 
+    if (isroot) {
+        $(newEle).on('dragstart', dragstart).on('dragend', dragend);
+    }
     // Add the head class to the first statement
     elem.find('td >.querystmts div >.remove').addClass('head');
 
     // Handle click for adding new statement segment
     // When a new statement is added add a condition to handle remove click.
     elem.find('td div >.add').click(function () {
-        $(this).parent().siblings('.querystmts').append(statement);
+        $(this).parent().siblings('.querystmts').append(statement)
+            .on('dragstart', dragstart).on('dragend', dragend);
         var stmts = $(this).parent().siblings('.querystmts').find('div >.remove').filter(':not(.head)');
         stmts.unbind('click');
         stmts.click(function () {
@@ -93,6 +117,87 @@ var addqueryroot = function (sel, isroot) {
         addqueryroot($(this).parent(), false);
     });
 };
+var dragEvent = null;
+var ghost = null;
+var dragged = null;
+var ghostposition = null;
+var ghostpositionBefore = null;
+var ghostRect = null;
+
+var dragstart = function (e) {
+    dragEvent = event;
+    event.stopPropagation();
+    dragged = $(event.target);
+    dragged.addClass('dragged');
+}
+var dragend = function (e) {
+    if (dragged == null)
+        return;
+    dragged.removeClass('dragged');
+    if (ghost != null)
+        ghost.replaceWith(dragged);
+    dragged = null; ghost = null;
+    dragEvent = null;
+   
+}
+var drop = function (e) {
+    console.log('drop');
+}
+var dragover = function (e) {
+    //console.log('dragover', event, dragEvent);
+    var dp = $(event.toElement).closest('.droptarget');
+    //console.log(event.x, event.y);
+    
+    /*if (ghost != null && hittest(event.x, event.y, ghostRect)) {
+        console.log('hit');
+        return;
+    }*/
+    if (dp.is(ghost)) 
+        return;
+    if (dp.is(dragged) && ghost!=null) {
+        setGhost(null);
+        return;
+    }
+    dp.addClass('emphasized');
+    setGhost(dragged.clone(), dp, true);
+}
+
+
+var setGhost = function (newghost, destination, before) {
+    console.log('setghost', newghost)
+    if (ghostposition != null && newghost != null && destination.is(ghostposition)) {
+        //reuse same ghost
+        if (ghostpositionBefore == before)
+            return;
+        else {
+            ghost.detach();
+        }
+    }
+    if (ghost != null) {
+        ghost.detach();
+        ghost = null;
+        ghostposition = null;
+    }
+    if (newghost == null) {
+        return;
+    }
+    ghost = newghost.addClass('ghost').removeClass('dragged').removeClass('emphasized');
+    if (before) {
+        destination.before(newghost);
+    }
+    else {
+        destination.after(newghost);
+    }
+    ghostposition = destination;
+    ghostpositionBefore = before;
+    ghostRect = {left: ghost.offset().left, top: ghost.offset().top, width : ghost.width(), height: ghost.height() }
+
+}
+
+var dragleave = function (e) {
+    //setGhost(null);
+    $(event.toElement).closest('.droptarget').removeClass('emphasized');
+}
 
 
 //Recursive method to parse the condition and generate the query. Takes the selector for the root condition
@@ -164,3 +269,10 @@ var getQuery = function (condition) {
     return ['(', q.join(op), ')'].join(' ');
 };
 
+
+var hittest = function( x,y, rect) {
+    if(x >=rect.left && x<=(rect.left + rect.width) && y >= rect.top && y<=(rect.top + rect.height))
+        return true;
+    else 
+        return false;
+}
