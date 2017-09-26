@@ -1,28 +1,67 @@
 (function ($) {
-    var settings;
+    $.fn.jsExpBuilder = function (fn, o) { // both fn and o are [optional]
+        return this.each(function () { // each() allows you to keep internal data separate for each DOM object that's being manipulated in case the jQuery object (from the original selector that generated this jQuery) is being referenced for later use
+            var $this = $(this); // in case $this is referenced in the short cuts
 
-    var methods = {
-        init: function (options) {
-            // Create some defaults, extending them with any options that were provided
-            settings = $.extend({
+            // short cut methods
+            if (fn === "method1") {
+                if ($this.data("method1"))  // if not initialized method invocation fails
+                    $this.data("method1")() // the () invokes the method passing user options
+            } else if (fn === "method2") {
+                if ($this.data("method2"))
+                    $this.data("method2")()
+            } else if (fn === "method3") {
+                if ($this.data("method3"))
+                    $this.data("method3")(o) // passing the user options to the method
+            } else if (fn === "destroy") {
+                if ($this.data("destroy"))
+                    $this.data("destroy")()
+            }
+            // continue with initial configuration
 
-            }, options);
+            var _data1,
+                _data2,
+                _default = { // contains all default parameters for any functions that may be called
+                    param1: "value #1",
+                    param2: "value #2",
+                },
+                _options = {
+                    param1: (o === undefined) ? _default.param1 : (o.param1 === undefined) ? _default.param1 : o.param1,
+                    param2: (o === undefined) ? _default.param2 : (o.param2 === undefined) ? _default.param2 : o.param2,
 
-            return this;
-        },
-    };
-
-    $.fn.expressionBuilder = function (method) {
-        if (methods[method]) {
-            return methods[method].apply(this, Array.prototype.slice.call(arguments, 1));
-        }
-        else if (typeof method === 'object' || !method) {
-            return methods.init.apply(this, arguments);
-        }
-        else {
-            $.error('Method ' + method + ' does not exist.');
-        }
-    };
+                }
+            method1 = function () {
+                // do something that requires no parameters
+                return;
+            },
+            method2 = function () {
+                // do some other thing that requires no parameters
+                return;
+            },
+            method3 = function () {
+                // does something with param1
+                // _options can be reset from the user options parameter - (o) - from within any of these methods as is done above
+                return;
+            },
+            initialize = function () {
+                // may or may not use data1, data2, param1 and param2
+                $this
+                    .data("method1", method1)
+                    .data("method2", method2)
+                    .data("method3", method3)
+                    .data("destroy", destroy);
+            },
+            destroy = function () {
+                // be sure to unbind any events that were bound in initialize(), then:
+                $this
+                    .removeData("method1", method1)
+                    .removeData("method2", method2)
+                    .removeData("method3", method3)
+                    .removeData("destroy", destroy);
+            }
+            initialize();
+        }) // end of each()
+    } // end of function        
 })(jQuery);
 
 
@@ -30,11 +69,11 @@
 
 
 
-var rootcondition = '<table class="dropable"><tr class="droptarget"><td class="seperator" ><img src="res/remove.png" alt="Remove" class="remove" /><select><option value="and">And</option><option value="or">Or</option></select></td>';
+var rootcondition = '<table class="dropable" cellspacing="0"><tr class="droptarget operator"><td class="seperator" ><img src="res/remove.png" alt="Remove" class="remove" /><select><option value="and">And</option><option value="or">Or</option></select></td>';
 rootcondition += '<td><div class="querystmts"></div><div><img class="add" src="res/add.png" alt="Add" /> <button class="addroot">+()</button></div>';
 rootcondition += '</td></tr></table>';
 
-var statement = '<div draggable="true" class="draggable droptarget" ><span class="handle"> H </span><img src="res/remove.png" alt="Remove" class="remove" />'
+var statement = '<div draggable="true" class="draggable droptarget stmt" ><span class="handle"> H </span><img src="res/remove.png" alt="Remove" class="remove" />'
 
 statement += '<select class="col">';
 statement += '<option value="code">Code</option>';
@@ -118,11 +157,11 @@ var addqueryroot = function (sel, isroot) {
     });
 };
 var dragEvent = null;
-var ghost = null;
+var placeholder = null;
 var dragged = null;
-var ghostposition = null;
-var ghostpositionBefore = null;
-var ghostRect = null;
+var placeholderPosition = null;
+var placeholderPositionBefore = null;
+var placeholderRect = null;
 
 var dragstart = function (e) {
     dragEvent = event;
@@ -134,64 +173,81 @@ var dragend = function (e) {
     if (dragged == null)
         return;
     dragged.removeClass('dragged');
-    if (ghost != null)
-        ghost.replaceWith(dragged);
-    dragged = null; ghost = null;
+    if (placeholder != null) {
+        dragged.detach();
+        placeholder.replaceWith(dragged);
+    }
+    dragged = null; placeholder = null;
     dragEvent = null;
    
+}
+var createPlaceholder = function (dragged) {
+    if( dragged.is('stmt'))
+        return dragged.clone();
+    var stmt = $(statement);
+    stmt.find('select').first().replaceWith(dragged.html());
+    return stmt;
 }
 var drop = function (e) {
     console.log('drop');
 }
 var dragover = function (e) {
     //console.log('dragover', event, dragEvent);
-    var dp = $(event.toElement).closest('.droptarget');
-    //console.log(event.x, event.y);
-    
-    /*if (ghost != null && hittest(event.x, event.y, ghostRect)) {
-        console.log('hit');
+    var dparent = $(event.toElement).closest('.operator');
+    if ($(placeholder).closest('.operator').is(dparent))
         return;
-    }*/
-    if (dp.is(ghost)) 
-        return;
-    if (dp.is(dragged) && ghost!=null) {
+    if (dragged.closest('.operator').is(dparent)) {
         setGhost(null);
         return;
     }
-    dp.addClass('emphasized');
-    setGhost(dragged.clone(), dp, true);
+
+    //console.log(event.x, event.y);
+    
+    /*if (placeholder != null && hittest(event.x, event.y, placeholderRect)) {
+        console.log('hit');
+        return;
+    }*/
+    /*if (dp.is(placeholder)) 
+        return;
+    if (dp.is(dragged) && placeholder!=null) {
+        setGhost(null);
+        return;
+    }*/
+    dparent.addClass('emphasized');
+    var ph = createPlaceholder(dragged);
+    setGhost(ph, dparent.find('.querystmts').first());
 }
 
 
-var setGhost = function (newghost, destination, before) {
-    console.log('setghost', newghost)
-    if (ghostposition != null && newghost != null && destination.is(ghostposition)) {
-        //reuse same ghost
-        if (ghostpositionBefore == before)
+var setGhost = function (newPlaceholder, destination, before) {
+    console.log('setplaceholder', newPlaceholder)
+    if (placeholderPosition != null && newPlaceholder != null && destination.is(placeholderPosition)) {
+        //reuse same placeholder
+        if (placeholderPositionBefore == before)
             return;
         else {
-            ghost.detach();
+            placeholder.detach();
         }
     }
-    if (ghost != null) {
-        ghost.detach();
-        ghost = null;
-        ghostposition = null;
+    if (placeholder != null) {
+        placeholder.detach();
+        placeholder = null;
+        placeholderPosition = null;
     }
-    if (newghost == null) {
+    if (newPlaceholder == null) {
         return;
     }
-    ghost = newghost.addClass('ghost').removeClass('dragged').removeClass('emphasized');
+    placeholder = newPlaceholder.addClass('placeholder').removeClass('dragged').removeClass('emphasized');
     if (before) {
-        destination.before(newghost);
+        destination.before(newPlaceholder);
     }
     else {
-        destination.after(newghost);
+        destination.append(newPlaceholder);
+        newPlaceholder.hide().slideDown();
     }
-    ghostposition = destination;
-    ghostpositionBefore = before;
-    ghostRect = {left: ghost.offset().left, top: ghost.offset().top, width : ghost.width(), height: ghost.height() }
-
+    placeholderPosition = destination;
+    placeholderPositionBefore = before;
+    placeholderRect = {left: placeholder.offset().left, top: placeholder.offset().top, width : placeholder.width(), height: placeholder.height() }
 }
 
 var dragleave = function (e) {
@@ -276,3 +332,7 @@ var hittest = function( x,y, rect) {
     else 
         return false;
 }
+
+$(function () {
+    $('.fields .draggable').on('dragstart', dragstart).on('dragend', dragend);
+});
