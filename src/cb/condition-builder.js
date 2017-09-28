@@ -111,7 +111,8 @@ statement += '</select>'
 statement += '<input type="text" /></div>';
 
 var addqueryroot = function (sel, isroot) {
-    $(sel).append(rootcondition).find('.dropable').on('dragover', dragover).on('drop', drop).on('dragleave', dragleave);
+    var newc = $(sel).append(rootcondition);
+    bindEvents(newc);
     var q = $(sel).find('table');
     var l = q.length;
     var elem = q;
@@ -156,12 +157,18 @@ var addqueryroot = function (sel, isroot) {
         addqueryroot($(this).parent(), false);
     });
 };
+
+var bindEvents = function ($ele) {
+    $ele.find('.dropable').on('dragover', dragover).on('drop', drop).on('dragleave', dragleave);
+}
 var dragEvent = null;
 var placeholder = null;
 var dragged = null;
 var placeholderPosition = null;
 var placeholderPositionBefore = null;
 var placeholderRect = null;
+var placeholderIsCondition = false;
+
 
 var dragstart = function (e) {
     dragEvent = event;
@@ -175,15 +182,21 @@ var dragend = function (e) {
     dragged.removeClass('dragged');
     if (placeholder != null) {
         dragged.detach();
-        placeholder.replaceWith(dragged);
+        placeholder.removeClass('placeholder');
     }
     dragged = null; placeholder = null;
     dragEvent = null;
    
 }
-var createPlaceholder = function (dragged) {
-    if( dragged.is('stmt'))
+var createPlaceholder = function (dragged, condition) {
+    if (dragged.is('.stmt')) {
+        if (condition) {
+            var result = $(rootcondition);
+            result.find('.querystmts').append(dragged.clone());
+            return result;
+        }
         return dragged.clone();
+    }
     var stmt = $(statement);
     stmt.find('select').first().replaceWith(dragged.html());
     return stmt;
@@ -194,12 +207,15 @@ var drop = function (e) {
 var dragover = function (e) {
     //console.log('dragover', event, dragEvent);
     var dparent = $(event.toElement).closest('.operator');
-    if ($(placeholder).closest('.operator').is(dparent))
-        return;
-    if (dragged.closest('.operator').is(dparent)) {
-        setGhost(null);
+    var wantSubCondition = event.offsetX > 30;
+    if ($(placeholder).closest('.operator').is(dparent) && wantSubCondition == placeholderIsCondition) {
         return;
     }
+    if (dragged.closest('.operator').is(dparent) && !wantSubCondition) {
+        setPlaceholder(null);
+        return;
+    }
+   
 
     //console.log(event.x, event.y);
     
@@ -210,16 +226,16 @@ var dragover = function (e) {
     /*if (dp.is(placeholder)) 
         return;
     if (dp.is(dragged) && placeholder!=null) {
-        setGhost(null);
+        setPlaceholder(null);
         return;
     }*/
     dparent.addClass('emphasized');
-    var ph = createPlaceholder(dragged);
-    setGhost(ph, dparent.find('.querystmts').first());
+    var ph = createPlaceholder(dragged, wantSubCondition ? 'or' : null);
+    setPlaceholder(ph, dparent.find('.querystmts').first());
 }
 
 
-var setGhost = function (newPlaceholder, destination, before) {
+var setPlaceholder = function (newPlaceholder, destination, before) {
     console.log('setplaceholder', newPlaceholder)
     if (placeholderPosition != null && newPlaceholder != null && destination.is(placeholderPosition)) {
         //reuse same placeholder
@@ -245,13 +261,14 @@ var setGhost = function (newPlaceholder, destination, before) {
         destination.append(newPlaceholder);
         newPlaceholder.hide().slideDown();
     }
+    bindEvents(newPlaceholder);
     placeholderPosition = destination;
     placeholderPositionBefore = before;
     placeholderRect = {left: placeholder.offset().left, top: placeholder.offset().top, width : placeholder.width(), height: placeholder.height() }
 }
 
 var dragleave = function (e) {
-    //setGhost(null);
+    //setPlaceholder(null);
     $(event.toElement).closest('.droptarget').removeClass('emphasized');
 }
 
