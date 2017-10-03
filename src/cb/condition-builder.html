@@ -9,9 +9,10 @@
             /* CSS 3 standard */
             opacity: 0.5;
         }
-        .seperator
+        .separator
         {
             border-right: 2px solid brown;
+            width: 60px;
         }
         .querystmts {
             min-height: 40px;
@@ -24,6 +25,22 @@
         }
         .dragged {
             border: 1px solid blue;
+        }
+        .hoverctl {
+            display:none;
+        }
+        .directhover > .hoverctl{
+            display:initial;
+        }
+         .ctl {
+            display:inline-block;
+            width: 60px;
+        }
+        .directhover > .ctl{
+            display:none;
+        }
+        .directhover {
+            border: 2px solid brown;
         }
 
     </style>

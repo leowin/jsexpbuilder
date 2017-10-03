@@ -69,11 +69,11 @@
 
 
 
-var rootcondition = '<table class="dropable" cellspacing="0"><tr class="droptarget operator"><td class="seperator" ><img src="res/remove.png" alt="Remove" class="remove" /><select><option value="and">And</option><option value="or">Or</option></select></td>';
-rootcondition += '<td><div class="querystmts"></div><div><img class="add" src="res/add.png" alt="Add" /> <button class="addroot">+()</button></div>';
+var rootcondition = '<table class="dropable" cellspacing="0"><tr class="droptarget operator"><td class="separator hoverele" ><img src="res/remove.png" alt="Remove" class="remove hoverctl" /><span class="ctl">And</span><select class=" hoverctl"><option value="and">And</option><option value="or">Or</option></select></td>';
+rootcondition += '<td class="operatorcontent"><div class="querystmts"></div><div><img class="add hoverctl" src="res/add.png" alt="Add" /> <button class="addroot hoverctl">+()</button></div>';
 rootcondition += '</td></tr></table>';
 
-var statement = '<div draggable="true" class="draggable droptarget stmt" ><span class="handle"> H </span><img src="res/remove.png" alt="Remove" class="remove" />'
+var statement = '<div draggable="true" class="draggable droptarget stmt hoverele" ><span class="handle"> H </span><img src="res/remove.png" alt="Remove" class="remove hoverctl" />'
 
 statement += '<select class="col">';
 statement += '<option value="code">Code</option>';
@@ -133,6 +133,8 @@ var addqueryroot = function (sel, isroot) {
 
     // Add the default staement segment to the root condition
     var newEle = $(statement).appendTo(elem.find('td >.querystmts'));
+    bindStmtEvents(newEle);
+
 
     if (isroot) {
         $(newEle).on('dragstart', dragstart).on('dragend', dragend);
@@ -143,8 +145,10 @@ var addqueryroot = function (sel, isroot) {
     // Handle click for adding new statement segment
     // When a new statement is added add a condition to handle remove click.
     elem.find('td div >.add').click(function () {
-        $(this).parent().siblings('.querystmts').append(statement)
-            .on('dragstart', dragstart).on('dragend', dragend);
+        var $newstmt = $(statement);
+        $(this).parent().siblings('.querystmts').append($newstmt);
+        bindStmtEvents($newstmt);
+            
         var stmts = $(this).parent().siblings('.querystmts').find('div >.remove').filter(':not(.head)');
         stmts.unbind('click');
         stmts.click(function () {
@@ -157,9 +161,30 @@ var addqueryroot = function (sel, isroot) {
         addqueryroot($(this).parent(), false);
     });
 };
+var bindStmtEvents = function ($ele) {
+    $ele.on('dragstart', dragstart).on('dragend', dragend);
+    $ele.hover(function () {
+       // console.log('hover', event.target);
+        var $he = $(event.target).closest('.hoverele');
+        $('.directhover').removeClass('directhover');
+        $he.addClass('directhover');
+    }, function () {
+       // console.log('hover-out', event.target);
+        $(event.target).closest('.hoverele').removeClass('directhover');
+    });
 
+}
 var bindEvents = function ($ele) {
     $ele.find('.dropable').on('dragover', dragover).on('drop', drop).on('dragleave', dragleave);
+    $ele.find('.hoverele').hover(function () {
+        //console.log('Ohover', event.target);
+        var $he = $(event.target).closest('.hoverele');
+        $('.directhover').removeClass('directhover');
+        $he.addClass('directhover');
+    }, function () {
+        //console.log('Ohover-out', event.target);
+        $(event.target).closest('.hoverele').removeClass('directhover');
+    });
 }
 var dragEvent = null;
 var placeholder = null;
@@ -183,10 +208,11 @@ var dragend = function (e) {
     if (placeholder != null) {
         dragged.detach();
         placeholder.removeClass('placeholder');
+        bindStmtEvents(placeholder);
     }
     dragged = null; placeholder = null;
     dragEvent = null;
-   
+    placeholderPosition = null;
 }
 var createPlaceholder = function (dragged, condition) {
     if (dragged.is('.stmt')) {
